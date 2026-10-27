@@ -1,0 +1,15 @@
+# Local binaries
+/app-intelligence-mcp
+/bin/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+coverage.out
+*.test
+
+# macOS
+.DS_Store
