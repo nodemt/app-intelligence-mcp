@@ -60,25 +60,29 @@ func getKeywordRankings(ctx context.Context, req *mcp.CallToolRequest, input Key
 		return nil, KeywordRankingsOutput{}, fmt.Errorf("keyword must not be empty")
 	}
 
-	previous := 18
-	current := 11
-
-	snapshot := RankingSnapshot{
-		Keyword:      input.Keyword,
-		PreviousRank: &previous,
-		CurrentRank:  &current,
-	}
+	snapshot := mockRanking(input.Keyword)
 
 	change, _ := snapshot.Change()
 
 	output := KeywordRankingsOutput{
 		Keyword:      input.Keyword,
 		RankChange:   change,
-		CurrentRank:  current,
-		PreviousRank: previous,
+		CurrentRank:  *snapshot.CurrentRank,
+		PreviousRank: *snapshot.PreviousRank,
 	}
 
 	return nil, output, nil
+}
+
+func mockRanking(keyword string) RankingSnapshot {
+	previous := 18
+	current := 11
+
+	return RankingSnapshot{
+		Keyword:      keyword,
+		PreviousRank: &previous,
+		CurrentRank:  &current,
+	}
 }
 
 func (s RankingSnapshot) Change() (int, bool) {
