@@ -1,6 +1,7 @@
 package main
 
 import (
+	"app-intelligence-mcp/internal/astro"
 	"context"
 	"encoding/json"
 	"testing"
@@ -9,12 +10,37 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type fakeRankingProvider struct {
+	rankings []astro.Ranking
+}
+
+func (f *fakeRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string) ([]astro.Ranking, error) {
+	return f.rankings, nil
+}
+
 func TestKeywordRankingsTool(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	previous := 18
+	current := 11
+
+	provider := &fakeRankingProvider{
+		rankings: []astro.Ranking{
+			{
+				App:             "Test App",
+				Keyword:         "photo editor",
+				Store:           "es",
+				Platform:        "iphone",
+				PreviousRanking: &previous,
+				CurrentRanking:  &current,
+				LastUpdate:      time.Date(2026, time.October, 29, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
 	// Server
-	server := newServer()
+	server := newServer(provider)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 
@@ -62,7 +88,9 @@ func TestKeywordRankingsTool(t *testing.T) {
 	callResult, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "get_keyword_rankings",
 		Arguments: map[string]any{
-			"keyword": "photo editor",
+			"keyword":  "photo editor",
+			"store":    "es",
+			"platform": "iphone",
 		},
 	})
 	if err != nil {
@@ -85,26 +113,65 @@ func TestKeywordRankingsTool(t *testing.T) {
 		t.Fatalf("decode structured content: %v", err)
 	}
 
-	if output.Keyword != "photo editor" {
-		t.Errorf("Keyword %q, want %q", output.Keyword, "photo editor")
+	if len(output.Rankings) != 1 {
+		t.Fatalf("got %d rankings, want 1", len(output.Rankings))
 	}
 
-	if output.CurrentRank != 11 {
-		t.Errorf("CurrentRank = %d, want 11", output.CurrentRank)
+	item := output.Rankings[0]
+	if item.Keyword != "photo editor" {
+		t.Errorf("Keyword = %q, want %q", item.Keyword, "photo editor")
 	}
 
-	if output.PreviousRank != 18 {
-		t.Errorf("PreviousRank = %d, want 18", output.PreviousRank)
+	if item.CurrentRank == nil {
+		t.Fatal("CurrentRank is nil, want a rank value")
 	}
 
-	if output.RankChange != 7 {
-		t.Errorf("RankChange = %d, want 7", output.RankChange)
+	if *item.CurrentRank != 11 {
+		t.Errorf("CurrentRank = %d, want 11", *item.CurrentRank)
+	}
+
+	if item.PreviousRank == nil {
+		t.Fatal("PreviousRank is nil, want a rank value")
+	}
+
+	if *item.PreviousRank != 18 {
+		t.Errorf("PreviousRank = %d, want 18", *item.PreviousRank)
+	}
+
+	if item.CurrentRankStatus != astro.RankStatusRanked {
+		t.Errorf(
+			"CurrentRankStatus = %q, want %q",
+			item.CurrentRankStatus, astro.RankStatusRanked,
+		)
+	}
+
+	if item.PreviousRankStatus != astro.RankStatusRanked {
+		t.Errorf(
+			"PreviousRankStatus = %q, want %q",
+			item.PreviousRankStatus, astro.RankStatusRanked,
+		)
+	}
+
+	if item.Store != "es" {
+		t.Errorf("Store = %q, want %q", item.Store, "es")
+	}
+
+	if item.Platform != "iphone" {
+		t.Errorf("Platform = %q, want %q", item.Platform, "iphone")
+	}
+
+	wantUpdate := time.Date(2026, time.October, 29, 12, 0, 0, 0, time.UTC)
+
+	if !item.LastUpdate.Equal(wantUpdate) {
+		t.Errorf("LastUpdate = %s, want %s", item.LastUpdate, wantUpdate)
 	}
 
 	emptyResult, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "get_keyword_rankings",
 		Arguments: map[string]any{
-			"keyword": "	",
+			"keyword":  "	",
+			"store":    "es",
+			"platform": "iphone",
 		},
 	})
 	if err != nil {

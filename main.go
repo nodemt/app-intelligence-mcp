@@ -1,10 +1,12 @@
 package main
 
 import (
+	"app-intelligence-mcp/internal/astro"
 	"context"
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -16,25 +18,44 @@ type RankingSnapshot struct {
 }
 
 type KeywordRankingsInput struct {
-	Keyword string `json:"keyword" jsonschema:"Keyword to look up"`
+	Keyword  string `json:"keyword" jsonschema:"Keyword to search for"`
+	Store    string `json:"store" jsonschema:"App Store country code, for example es or us"`
+	Platform string `json:"platform" jsonschema:"Platform, for example iphone or ipad"`
+}
+
+type KeywordRankingItem struct {
+	App                string           `json:"app"`
+	Keyword            string           `json:"keyword"`
+	Store              string           `json:"store"`
+	Platform           string           `json:"platform"`
+	CurrentRank        *int             `json:"current_rank"`
+	PreviousRank       *int             `json:"previous_rank"`
+	LastUpdate         time.Time        `json:"last_update"`
+	CurrentRankStatus  astro.RankStatus `json:"current_rank_status"`
+	PreviousRankStatus astro.RankStatus `json:"previous_rank_status"`
 }
 
 type KeywordRankingsOutput struct {
-	Keyword      string `json:"keyword"`
-	RankChange   int    `json:"rank_change"`
-	CurrentRank  int    `json:"current_rank"`
-	PreviousRank int    `json:"previous_rank"`
+	Rankings []KeywordRankingItem `json:"rankings"`
 }
 
 func main() {
-	server := newServer()
+	ctx := context.Background()
 
-	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+	provider, err := astro.Connect(ctx, "http://127.0.0.1:8089/mcp")
+	if err != nil {
 		log.Fatal(err)
+	}
+	defer provider.Close()
+
+	server := newServer(provider)
+
+	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {
+		log.Print(err)
 	}
 }
 
-func newServer() *mcp.Server {
+func newServer(provider RankingProvider) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
 			Name:    "app-intelligence-mcp",
@@ -43,32 +64,60 @@ func newServer() *mcp.Server {
 		nil,
 	)
 
+	handler := &KeywordHandler{
+		provider: provider,
+	}
+
 	mcp.AddTool(
 		server,
 		&mcp.Tool{
 			Name:        "get_keyword_rankings",
 			Description: "Return mock keyword rankings for learning. Not real ASO data.",
 		},
-		getKeywordRankings,
+		handler.GetKeywordRankings,
 	)
 
 	return server
 }
 
-func getKeywordRankings(ctx context.Context, req *mcp.CallToolRequest, input KeywordRankingsInput) (*mcp.CallToolResult, KeywordRankingsOutput, error) {
+func (h *KeywordHandler) GetKeywordRankings(ctx context.Context, req *mcp.CallToolRequest, input KeywordRankingsInput) (*mcp.CallToolResult, KeywordRankingsOutput, error) {
 	if strings.TrimSpace(input.Keyword) == "" {
 		return nil, KeywordRankingsOutput{}, fmt.Errorf("keyword must not be empty")
 	}
 
-	snapshot := mockRanking(input.Keyword)
-
-	change, _ := snapshot.Change()
+	rankings, err := h.provider.GetKeywordPerformance(
+		ctx,
+		input.Keyword,
+		input.Store,
+		input.Platform,
+	)
+	if err != nil {
+		return nil, KeywordRankingsOutput{}, fmt.Errorf(
+			"get keyword rankings: %w", err,
+		)
+	}
 
 	output := KeywordRankingsOutput{
-		Keyword:      input.Keyword,
-		RankChange:   change,
-		CurrentRank:  *snapshot.CurrentRank,
-		PreviousRank: *snapshot.PreviousRank,
+		Rankings: make([]KeywordRankingItem, 0, len(rankings)),
+	}
+
+	for _, ranking := range rankings {
+		currentRank, currentStatus := astro.NormalizeRank(ranking.CurrentRanking)
+		previousRank, previousStatus := astro.NormalizeRank(ranking.PreviousRanking)
+
+		item := KeywordRankingItem{
+			App:                ranking.App,
+			Keyword:            ranking.Keyword,
+			Store:              ranking.Store,
+			Platform:           ranking.Platform,
+			CurrentRank:        currentRank,
+			CurrentRankStatus:  currentStatus,
+			PreviousRank:       previousRank,
+			PreviousRankStatus: previousStatus,
+			LastUpdate:         ranking.LastUpdate,
+		}
+
+		output.Rankings = append(output.Rankings, item)
 	}
 
 	return nil, output, nil
