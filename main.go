@@ -4,9 +4,13 @@ import (
 	"app-intelligence-mcp/internal/astro"
 	"app-intelligence-mcp/internal/constants"
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -41,7 +45,12 @@ type KeywordRankingsOutput struct {
 }
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
 
 	provider, err := astro.Connect(ctx, constants.AstroDefaultEndpoint)
 	if err != nil {
@@ -52,7 +61,9 @@ func main() {
 	server := newServer(provider)
 
 	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {
-		log.Print(err)
+		if !errors.Is(err, context.Canceled) {
+			log.Print(err)
+		}
 	}
 }
 
