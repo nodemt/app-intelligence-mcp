@@ -103,8 +103,11 @@ func (h *KeywordHandler) GetKeywordRankings(ctx context.Context, req *mcp.CallTo
 		)
 	}
 
+	providerCtx, cancel := context.WithTimeout(ctx, constants.AstroRequestTimeout)
+	defer cancel()
+
 	rankings, err := h.provider.GetKeywordPerformance(
-		ctx,
+		providerCtx,
 		input.Keyword,
 		input.Store,
 		input.Platform,

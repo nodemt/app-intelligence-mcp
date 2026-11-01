@@ -1,5 +1,7 @@
 package constants
 
+import "time"
+
 const (
 	AstroDefaultEndpoint  = "http://127.0.0.1:8089/mcp"
 	AstroDefaultPeriod    = "all"
@@ -13,3 +15,5 @@ const (
 	AstroPlatformAppleTV       = "appletv"
 	AstroPlatformRealityDevice = "realityDevice"
 )
+
+const AstroRequestTimeout = 10 * time.Second

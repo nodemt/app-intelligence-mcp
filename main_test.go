@@ -5,6 +5,7 @@ import (
 	"app-intelligence-mcp/internal/constants"
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -12,13 +13,24 @@ import (
 )
 
 type fakeRankingProvider struct {
-	rankings []astro.Ranking
-	calls    int
+	rankings    []astro.Ranking
+	calls       int
+	err         error
+	deadline    time.Time
+	hasDeadline bool
 }
+
+type waitingRankingProvider struct{}
 
 func (f *fakeRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string) ([]astro.Ranking, error) {
 	f.calls++
-	return f.rankings, nil
+	f.deadline, f.hasDeadline = ctx.Deadline()
+	return f.rankings, f.err
+}
+
+func (p *waitingRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string) ([]astro.Ranking, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
 }
 
 func TestKeywordRankingsTool(t *testing.T) {
@@ -302,5 +314,92 @@ func TestKeywordHandlerRejectsUnsupportedPlatform(t *testing.T) {
 
 	if provider.calls != 0 {
 		t.Errorf("provider calls = %d, want 0", provider.calls)
+	}
+}
+
+func TestKeywordHandlerProviderFailure(t *testing.T) {
+	providerErr := errors.New("provider unavailable")
+
+	provider := &fakeRankingProvider{
+		err: providerErr,
+	}
+	handler := &KeywordHandler{provider: provider}
+
+	_, _, err := handler.GetKeywordRankings(
+		context.Background(),
+		nil,
+		KeywordRankingsInput{
+			Keyword:  "photo editor",
+			Store:    "es",
+			Platform: constants.AstroPlatformIPhone,
+		},
+	)
+
+	if !errors.Is(err, providerErr) {
+		t.Errorf("got error %v, want wrapped provider error %v", err, providerErr)
+	}
+
+	if provider.calls != 1 {
+		t.Errorf("provider calls = %d, want 1", provider.calls)
+	}
+}
+
+func TestKeywordHandlerRespectsDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	handler := &KeywordHandler{
+		provider: &waitingRankingProvider{},
+	}
+
+	_, _, err := handler.GetKeywordRankings(
+		ctx,
+		nil,
+		KeywordRankingsInput{
+			Keyword:  "photo editor",
+			Store:    "es",
+			Platform: constants.AstroPlatformIPhone,
+		},
+	)
+
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("got error %v, want context deadline exceeded", err)
+	}
+}
+
+func TestKeywordHandlerAddsDeadline(t *testing.T) {
+	provider := &fakeRankingProvider{}
+	handler := &KeywordHandler{provider: provider}
+
+	before := time.Now()
+
+	_, _, err := handler.GetKeywordRankings(
+		context.Background(),
+		nil,
+		KeywordRankingsInput{
+			Keyword:  "photo editor",
+			Store:    "es",
+			Platform: constants.AstroPlatformIPhone,
+		},
+	)
+
+	after := time.Now()
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !provider.hasDeadline {
+		t.Fatal("provider context has no deadline")
+	}
+
+	earliest := before.Add(constants.AstroRequestTimeout)
+	latest := after.Add(constants.AstroRequestTimeout)
+
+	if provider.deadline.Before(earliest) || provider.deadline.After(latest) {
+		t.Errorf(
+			"deadline = %s, want between %s and %s",
+			provider.deadline, earliest, latest,
+		)
 	}
 }
