@@ -2,6 +2,7 @@ package main
 
 import (
 	"app-intelligence-mcp/internal/astro"
+	"app-intelligence-mcp/internal/constants"
 	"context"
 	"encoding/json"
 	"testing"
@@ -12,9 +13,11 @@ import (
 
 type fakeRankingProvider struct {
 	rankings []astro.Ranking
+	calls    int
 }
 
 func (f *fakeRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string) ([]astro.Ranking, error) {
+	f.calls++
 	return f.rankings, nil
 }
 
@@ -253,5 +256,51 @@ func TestRankingSnapshotChangeTable(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestKeywordHandlerRejectsEmptyStore(t *testing.T) {
+	provider := &fakeRankingProvider{}
+	handler := &KeywordHandler{provider: provider}
+
+	_, _, err := handler.GetKeywordRankings(
+		context.Background(),
+		nil,
+		KeywordRankingsInput{
+			Keyword:  "photo editor",
+			Store:    " ",
+			Platform: constants.AstroPlatformIPhone,
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected an error for blank store")
+	}
+
+	if provider.calls != 0 {
+		t.Errorf("provider calls = %d, want 0", provider.calls)
+	}
+}
+
+func TestKeywordHandlerRejectsUnsupportedPlatform(t *testing.T) {
+	provider := &fakeRankingProvider{}
+	handler := &KeywordHandler{provider: provider}
+
+	_, _, err := handler.GetKeywordRankings(
+		context.Background(),
+		nil,
+		KeywordRankingsInput{
+			Keyword:  "photo editor",
+			Store:    "es",
+			Platform: "android",
+		},
+	)
+
+	if err == nil {
+		t.Fatal("expected an error for unsupported platform")
+	}
+
+	if provider.calls != 0 {
+		t.Errorf("provider calls = %d, want 0", provider.calls)
 	}
 }

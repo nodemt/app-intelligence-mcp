@@ -86,6 +86,23 @@ func (h *KeywordHandler) GetKeywordRankings(ctx context.Context, req *mcp.CallTo
 		return nil, KeywordRankingsOutput{}, fmt.Errorf("keyword must not be empty")
 	}
 
+	if strings.TrimSpace(input.Store) == "" {
+		return nil, KeywordRankingsOutput{}, fmt.Errorf("store must not be empty")
+	}
+
+	switch input.Platform {
+	case constants.AstroPlatformIPhone,
+		constants.AstroPlatformIPad,
+		constants.AstroPlatformMac,
+		constants.AstroPlatformAppleTV,
+		constants.AstroPlatformRealityDevice:
+
+	default:
+		return nil, KeywordRankingsOutput{}, fmt.Errorf(
+			"unsupported platform: %q", input.Platform,
+		)
+	}
+
 	rankings, err := h.provider.GetKeywordPerformance(
 		ctx,
 		input.Keyword,

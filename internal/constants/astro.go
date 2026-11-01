@@ -5,3 +5,11 @@ const (
 	AstroDefaultPeriod    = "all"
 	AstroOutsideChartRank = 1000
 )
+
+const (
+	AstroPlatformIPhone        = "iphone"
+	AstroPlatformIPad          = "ipad"
+	AstroPlatformMac           = "mac"
+	AstroPlatformAppleTV       = "appletv"
+	AstroPlatformRealityDevice = "realityDevice"
+)

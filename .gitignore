@@ -13,3 +13,11 @@ coverage.out
 
 # macOS
 .DS_Store
+
+# Local editor settings
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+*~
