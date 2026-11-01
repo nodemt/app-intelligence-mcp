@@ -51,7 +51,11 @@ func TestKeywordRankingsTool(t *testing.T) {
 				Platform:        "iphone",
 				PreviousRanking: &previous,
 				CurrentRanking:  &current,
-				LastUpdate:      time.Date(2026, time.October, 29, 12, 0, 0, 0, time.UTC),
+				History: []astro.RankingPoint{
+					{Date: time.Date(2026, time.October, 28, 12, 0, 0, 0, time.UTC), Ranking: &previous},
+					{Date: time.Date(2026, time.October, 28, 12, 0, 0, 0, time.UTC), Ranking: &current},
+				},
+				LastUpdate: time.Date(2026, time.October, 29, 12, 0, 0, 0, time.UTC),
 			},
 		},
 	}
@@ -175,6 +179,20 @@ func TestKeywordRankingsTool(t *testing.T) {
 
 	if item.Platform != "iphone" {
 		t.Errorf("Platform = %q, want %q", item.Platform, "iphone")
+	}
+
+	if item.Comparison.Status != astro.ComparisonAvailable {
+		t.Errorf("comparison status = %q, want %q",
+			item.Comparison.Status, astro.ComparisonAvailable)
+	}
+
+	if item.Comparison.RankChange == nil {
+		t.Fatal("comparison rank change is nil, want 7")
+	}
+
+	if *item.Comparison.RankChange != 7 {
+		t.Errorf("comparison rank change = %d, want 7",
+			*item.Comparison.RankChange)
 	}
 
 	wantUpdate := time.Date(2026, time.October, 29, 12, 0, 0, 0, time.UTC)
