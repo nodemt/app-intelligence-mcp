@@ -29,16 +29,24 @@ type KeywordRankingsInput struct {
 	Platform string `json:"platform" jsonschema:"Platform, for example iphone or ipad"`
 }
 
+type RankingComparison struct {
+	Status     astro.ComparisonStatus `json:"status"`
+	From       *time.Time             `json:"from"`
+	To         *time.Time             `json:"to"`
+	RankChange *int                   `json:"rank_change"`
+}
+
 type KeywordRankingItem struct {
-	App                string           `json:"app"`
-	Keyword            string           `json:"keyword"`
-	Store              string           `json:"store"`
-	Platform           string           `json:"platform"`
-	CurrentRank        *int             `json:"current_rank"`
-	PreviousRank       *int             `json:"previous_rank"`
-	LastUpdate         time.Time        `json:"last_update"`
-	CurrentRankStatus  astro.RankStatus `json:"current_rank_status"`
-	PreviousRankStatus astro.RankStatus `json:"previous_rank_status"`
+	App                string            `json:"app"`
+	Keyword            string            `json:"keyword"`
+	Store              string            `json:"store"`
+	Platform           string            `json:"platform"`
+	CurrentRank        *int              `json:"current_rank"`
+	PreviousRank       *int              `json:"previous_rank"`
+	LastUpdate         time.Time         `json:"last_update"`
+	CurrentRankStatus  astro.RankStatus  `json:"current_rank_status"`
+	PreviousRankStatus astro.RankStatus  `json:"previous_rank_status"`
+	Comparison         RankingComparison `json:"comparison"`
 }
 
 type KeywordRankingsOutput struct {
@@ -154,6 +162,7 @@ func (h *KeywordHandler) GetKeywordRankings(ctx context.Context, req *mcp.CallTo
 			PreviousRank:       previousRank,
 			PreviousRankStatus: previousStatus,
 			LastUpdate:         ranking.LastUpdate,
+			Comparison:         buildRankingComparison(ranking.History),
 		}
 
 		output.Rankings = append(output.Rankings, item)
@@ -179,4 +188,23 @@ func (s RankingSnapshot) Change() (int, bool) {
 	}
 
 	return *s.PreviousRank - *s.CurrentRank, true
+}
+
+func buildRankingComparison(history []astro.RankingPoint) RankingComparison {
+	change, status := astro.HistoryChange(history)
+
+	comparison := RankingComparison{
+		Status: status,
+	}
+
+	if len(history) >= 2 {
+		comparison.From = &history[0].Date
+		comparison.To = &history[len(history)-1].Date
+	}
+
+	if status == astro.ComparisonAvailable {
+		comparison.RankChange = &change
+	}
+
+	return comparison
 }

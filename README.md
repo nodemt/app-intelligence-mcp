@@ -8,11 +8,11 @@ A Go MCP server that brings mobile app intelligence to AI agents, starting with 
 
 - MCP server built with the official Go SDK, exposing a local stdio interface
 - Astro integration through its local Streamable HTTP MCP server
-- Keyword rankings filtered by keyword, store, and platform
+- Keyword rankings filtered by keyword, store, platform, and optional App Store ID
 - Structured output distinguishing ranked, missing, and outside-chart values
 - Provider update timestamps preserved in results
-- Historical comparison in the standalone probe program
-- Unit tests, offline MCP integration tests, and an opt-in live Astro test
+- Dated historical comparisons in tool output with explicit availability statuses
+- Unit tests, offline MCP integration tests, and opt-in live Astro and subprocess stdio tests
 
 ## Requirements
 
@@ -20,7 +20,7 @@ A Go MCP server that brings mobile app intelligence to AI agents, starting with 
 - For live use: Astro running on the same machine with its MCP server enabled
 - An Astro version exposing `get_keyword_performance`
 
-The current application connects to `http://127.0.0.1:8089/mcp` during startup. If the connection fails, the application exits. Normal tests use a fake provider and require neither Astro nor a Claude subscription.
+The application connects to the endpoint configured by `ASTRO_MCP_ENDPOINT`, defaulting to `http://127.0.0.1:8089/mcp`, during startup. If the connection fails, the application exits. Normal tests use a fake provider and require neither Astro nor a Claude subscription.
 
 ## Getting started
 
@@ -89,7 +89,7 @@ Queries Astro's `get_keyword_performance` tool and returns normalized records.
 | `platform` | Astro platform: `iphone`, `ipad`, `mac`, `appletv`, or `realityDevice`              |
 | `app_id`   | Optional numeric App Store ID. When omitted, results are not restricted to one app. |
 
-All three fields are part of the current input contract. The handler rejects empty or whitespace-only keywords. Additional store and platform validation is planned.
+`keyword`, `store`, and `platform` are required; `app_id` is optional. The handler rejects blank keywords and stores, and unsupported platforms before calling the provider. Store codes are not yet checked against an authoritative list. App IDs are passed to Astro as strings; numeric-format validation is not currently enforced.
 
 ### Structured output
 
@@ -105,9 +105,15 @@ Illustrative response; values depend on the user's tracked data:
 			"platform": "iphone",
 			"current_rank": null,
 			"current_rank_status": "outside_charts",
-			"previous_rank": 131,
-			"previous_rank_status": "ranked",
-			"last_update": "2026-10-28T06:09:56Z"
+			"previous_rank": null,
+			"previous_rank_status": "outside_charts",
+			"last_update": "2026-11-01T12:44:24Z",
+			"comparison": {
+				"status": "outside_charts",
+				"from": "2026-04-01T22:08:57Z",
+				"to": "2026-11-01T12:44:24Z",
+				"rank_change": null
+			}
 		}
 	]
 }
@@ -121,12 +127,25 @@ Illustrative response; values depend on the user's tracked data:
 
 No matching records produce a successful `{"rankings": []}` response. Provider failures produce tool execution errors.
 
+### Historical comparison
+
+Each record includes a `comparison` object. `from` and `to` identify the first and last returned historical observations; they do not imply a fixed seven-day or thirty-day period. When available, `rank_change` is calculated as first rank minus last rank: positive means improvement and negative means decline.
+
+| Comparison status   | Meaning                                                                    | Rank change                        |
+| ------------------- | -------------------------------------------------------------------------- | ---------------------------------- |
+| `available`         | At least two observations and both endpoint ranks are present and in-chart | Calculated integer, including zero |
+| `insufficient_data` | Fewer than two observations                                                | `null`                             |
+| `missing_rank`      | An endpoint rank is missing                                                | `null`                             |
+| `outside_charts`    | An endpoint uses Astro's `1000` sentinel                                   | `null`                             |
+
+With fewer than two observations, both comparison dates are `null`. Otherwise the endpoint dates are preserved even when the rank difference is unavailable. Intermediate out-of-chart observations are not summarized by this endpoint comparison. History is expected in Astro's documented oldest-first order.
+
 ### Interpretation limits
 
-- Partial keyword matching can return multiple records. Our tool does not expose an app filter yet.
+- Partial keyword matching can return multiple records, even with an app filter. Supply `app_id` to restrict results to one tracked app.
 - `last_update` is the provider's data timestamp, not the tool invocation time. Data may be stale; no freshness threshold is enforced.
 - `previous_rank` has no separate timestamp. Do not interpret it as a seven-day comparison.
-- The provider client requests all available history, but the main tool does not expose history or its comparison yet.
+- The provider client requests all available history. The main tool exposes a comparison of its first and last observations, but does not expose the full history array or a selectable date range.
 - Out-of-chart values must not be treated as numeric positions in rank-difference calculations.
 
 ## Architecture
@@ -158,16 +177,17 @@ flowchart LR
     style App fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 ```
 
-`KeywordHandler` depends on the `RankingProvider` interface. The application supplies an `astro.Client`; offline tests supply a fake provider. The client handles MCP calls and decoding. The handler maps provider records into the public tool output and applies rank normalization.
+`KeywordHandler` depends on the `RankingProvider` interface. The application supplies an `astro.Client`; offline tests supply a fake provider. The client handles MCP calls and decoding. The handler maps provider records into the public tool output, normalizes ranks, and builds dated comparison results. Provider requests have a bounded context deadline and retain earlier caller deadlines.
 
-| Location          | Responsibility                                                      |
-| ----------------- | ------------------------------------------------------------------- |
-| Root application  | Server setup, tool contracts, handler, and provider interface       |
-| `internal/astro`  | Connection, provider types, normalization, and history calculations |
-| `cmd/astro-probe` | Separate discovery and live-data inspection program                 |
-| Root tests        | Offline MCP tests and the opt-in live Astro test                    |
+| Location             | Responsibility                                                      |
+| -------------------- | ------------------------------------------------------------------- |
+| Root application     | Server setup, tool contracts, handler, and provider interface       |
+| `internal/astro`     | Connection, provider types, normalization, and history calculations |
+| `cmd/astro-probe`    | Separate discovery and live-data inspection program                 |
+| Root tests           | Offline MCP tests and opt-in live Astro / subprocess stdio tests    |
+| `internal/constants` | Shared application, MCP, and Astro constants                        |
 
-The probe is not invoked by the main server. Its history comparison uses the first and last supplied observations and reports explicit comparison statuses. It does not establish a fixed calendar-period comparison.
+The probe is a separate developer tool and is not invoked by the main server. Both the probe and the main tool use the history comparison logic from `internal/astro`.
 
 The MCP server exposes tools; it is not an LLM or an agent runtime.
 
@@ -186,13 +206,22 @@ Run the offline MCP test alone:
 go test -run '^TestKeywordRankingsTool$' -v .
 ```
 
-Run the opt-in live test with Astro open and its MCP server enabled:
+Run the opt-in in-memory MCP test backed by live Astro data, with Astro open and its MCP server enabled:
 
 ```sh
 go test -tags=integration -run '^TestAstroConnectionLive$' -v .
 ```
 
-The live test currently queries `dibujo digital` in `es` on `iphone`. Adjust these values for your own tracked data. It checks the call for errors and logs the response; automated assertions on the live result structure are still pending. Live tests are excluded from normal runs by an `integration` build tag.
+Verify the compiled application's stdio startup, discovery, and tool invocation:
+
+```sh
+go build -o app-intelligence-mcp .
+go test -tags=integration -run '^TestStdioConnectionLive$' -v .
+```
+
+Rebuild the binary after application changes: the stdio test runs the existing binary and does not build it automatically.
+
+The live tests currently query `dibujo digital` in `es` on `iphone`. Adjust these values for your own tracked data. They check calls for errors and log responses; complete automated assertions on the live result structure are still pending. Live tests are excluded from normal runs by an `integration` build tag.
 
 Inspect Astro tools and history:
 
@@ -206,7 +235,7 @@ The probe also contains example query values that should be adjusted for your da
 
 Tool results can leave the local machine through the connected AI client. Review the data you expose and your client's data-handling policies.
 
-The current tool reads data and does not expose Astro's mutation tools. Treat provider text as data, not instructions. Keep credentials and private analytics fixtures out of source control and published logs.
+The current tool reads data and does not expose Astro's mutation tools. SIGINT and SIGTERM cancel the application context so it can close its provider connection. Treat provider text as data, not instructions. Keep credentials and private analytics fixtures out of source control and published logs.
 
 Remote hosting, multi-user authorization, and production security hardening are outside the current implementation.
 

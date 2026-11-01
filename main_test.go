@@ -428,3 +428,67 @@ func TestKeywordHandlerPassesAppID(t *testing.T) {
 		t.Errorf("provider appID = %q, want %q", provider.appID, "123456789")
 	}
 }
+
+func TestBuildRankingComparisonAvailable(t *testing.T) {
+	firstRank := 121
+	lastRank := 131
+
+	from := time.Date(2026, time.April, 1, 12, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	comparison := buildRankingComparison([]astro.RankingPoint{
+		{Date: from, Ranking: &firstRank},
+		{Date: to, Ranking: &lastRank},
+	})
+
+	if comparison.Status != astro.ComparisonAvailable {
+		t.Errorf("Status = %q, want %q",
+			comparison.Status, astro.ComparisonAvailable)
+	}
+
+	if comparison.RankChange == nil {
+		t.Fatal("RankChange is nil, want -10")
+	}
+	if *comparison.RankChange != -10 {
+		t.Errorf("RankChange = %d, want -10", *comparison.RankChange)
+	}
+
+	if comparison.From == nil || comparison.To == nil {
+		t.Fatal("comparison dates must not be nil")
+	}
+	if !comparison.From.Equal(from) || !comparison.To.Equal(to) {
+		t.Errorf("dates = (%v, %v), want (%v, %v)",
+			comparison.From, comparison.To, from, to)
+	}
+}
+
+func TestBuildRankingComparisonOutsideCharts(t *testing.T) {
+	firstRank := 121
+	lastRank := 1000
+
+	from := time.Date(2026, time.April, 1, 12, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	comparison := buildRankingComparison([]astro.RankingPoint{
+		{Date: from, Ranking: &firstRank},
+		{Date: to, Ranking: &lastRank},
+	})
+
+	if comparison.Status != astro.ComparisonOutsideCharts {
+		t.Errorf("Status = %q, want %q",
+			comparison.Status, astro.ComparisonOutsideCharts)
+	}
+
+	if comparison.RankChange != nil {
+		t.Errorf("RankChange = %v, want nil", comparison.RankChange)
+	}
+
+	if comparison.From == nil || comparison.To == nil {
+		t.Fatal("comparison dates must not be nil")
+	}
+
+	if !comparison.From.Equal(from) || !comparison.To.Equal(to) {
+		t.Errorf("dates = (%v, %v), want (%v, %v)",
+			comparison.From, comparison.To, from, to)
+	}
+}
