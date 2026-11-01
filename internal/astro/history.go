@@ -1,5 +1,7 @@
 package astro
 
+import "app-intelligence-mcp/internal/constants"
+
 type ComparisonStatus string
 
 const (
@@ -21,7 +23,7 @@ func HistoryChange(history []RankingPoint) (int, ComparisonStatus) {
 		return 0, ComparisonMissingRank
 	}
 
-	if *first.Ranking == 1000 || *last.Ranking == 1000 {
+	if *first.Ranking == constants.AstroOutsideChartRank || *last.Ranking == constants.AstroOutsideChartRank {
 		return 0, ComparisonOutsideCharts
 	}
 

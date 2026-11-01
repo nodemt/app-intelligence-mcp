@@ -2,6 +2,7 @@ package main
 
 import (
 	"app-intelligence-mcp/internal/astro"
+	"app-intelligence-mcp/internal/constants"
 	"context"
 	"fmt"
 	"log"
@@ -42,7 +43,7 @@ type KeywordRankingsOutput struct {
 func main() {
 	ctx := context.Background()
 
-	provider, err := astro.Connect(ctx, "http://127.0.0.1:8089/mcp")
+	provider, err := astro.Connect(ctx, constants.AstroDefaultEndpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,8 +59,8 @@ func main() {
 func newServer(provider RankingProvider) *mcp.Server {
 	server := mcp.NewServer(
 		&mcp.Implementation{
-			Name:    "app-intelligence-mcp",
-			Version: "0.1.0",
+			Name:    constants.AppName,
+			Version: constants.AppVersion,
 		},
 		nil,
 	)
@@ -71,8 +72,8 @@ func newServer(provider RankingProvider) *mcp.Server {
 	mcp.AddTool(
 		server,
 		&mcp.Tool{
-			Name:        "get_keyword_rankings",
-			Description: "Return mock keyword rankings for learning. Not real ASO data.",
+			Name:        constants.KeywordRankingsToolName,
+			Description: constants.KeywordRankingsToolDescription,
 		},
 		handler.GetKeywordRankings,
 	)

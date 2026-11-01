@@ -1,5 +1,7 @@
 package astro
 
+import "app-intelligence-mcp/internal/constants"
+
 type RankStatus string
 
 const (
@@ -13,7 +15,7 @@ func NormalizeRank(rank *int) (*int, RankStatus) {
 		return nil, RankStatusMissing
 	}
 
-	if *rank == 1000 {
+	if *rank == constants.AstroOutsideChartRank {
 		return nil, RankStatusOutsideCharts
 	}
 
