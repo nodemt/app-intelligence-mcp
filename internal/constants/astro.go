@@ -17,3 +17,5 @@ const (
 )
 
 const AstroRequestTimeout = 10 * time.Second
+
+const AstroConnectTimeout = 10 * time.Second

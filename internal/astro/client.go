@@ -15,8 +15,8 @@ type Client struct {
 func Connect(ctx context.Context, endpoint string) (*Client, error) {
 	client := mcp.NewClient(
 		&mcp.Implementation{
-			Name:    "app-intelligence-probe",
-			Version: "0.1.0",
+			Name:    constants.AstroClientName,
+			Version: constants.AppVersion,
 		},
 		nil,
 	)
@@ -25,9 +25,12 @@ func Connect(ctx context.Context, endpoint string) (*Client, error) {
 		Endpoint: endpoint,
 	}
 
-	session, err := client.Connect(ctx, transport, nil)
+	connectCtx, cancel := context.WithTimeout(ctx, constants.AstroConnectTimeout)
+	defer cancel()
+
+	session, err := client.Connect(connectCtx, transport, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("connect to Astro: %w", err)
 	}
 
 	return &Client{session: session}, nil
