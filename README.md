@@ -34,9 +34,39 @@ go build -o app-intelligence-mcp .
 
 Enable Astro's MCP server in its settings before launching the application.
 
-The binary is intended to be launched by an MCP client using stdio. Running it directly waits for MCP messages; it does not open an HTTP endpoint or an interactive prompt. Protocol messages use stdout; logs use stderr.
+### Connect an MCP client
 
-External client configuration and subprocess-based stdio invocation have not yet been verified. Live verification so far uses an in-memory MCP client connected to our server, which calls Astro over HTTP.
+Configure your MCP client to launch the compiled binary over stdio.
+For clients that accept an `mcpServers` configuration:
+
+```json
+{
+	"mcpServers": {
+		"app-intelligence": {
+			"command": "/absolute/path/to/app-intelligence-mcp",
+			"env": {
+				"ASTRO_MCP_ENDPOINT": "http://127.0.0.1:8089/mcp"
+			}
+		}
+	}
+}
+```
+
+Replace `command` with the absolute path to your compiled binary.
+Configuration locations and supported fields depend on the client.
+
+Astro must be running on the same machine with its MCP server enabled.
+The application connects to Astro during startup and exits if that
+connection fails. The endpoint defaults to
+`http://127.0.0.1:8089/mcp` when `ASTRO_MCP_ENDPOINT` is empty.
+
+The binary waits for MCP messages; it does not provide an interactive
+prompt or expose its own HTTP endpoint. Protocol messages use stdout;
+application logs use stderr.
+
+Subprocess startup, tool discovery, and live Astro tool invocation over
+stdio have been verified using the official Go SDK client. Individual
+desktop client configurations have not yet been verified.
 
 ## Tool: `get_keyword_rankings`
 
