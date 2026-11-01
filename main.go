@@ -23,6 +23,7 @@ type RankingSnapshot struct {
 }
 
 type KeywordRankingsInput struct {
+	AppID    string `json:"app_id,omitempty" jsonschema:"Optional App Store ID to filter results"`
 	Keyword  string `json:"keyword" jsonschema:"Keyword to search for"`
 	Store    string `json:"store" jsonschema:"App Store country code, for example es or us"`
 	Platform string `json:"platform" jsonschema:"Platform, for example iphone or ipad"`
@@ -127,6 +128,7 @@ func (h *KeywordHandler) GetKeywordRankings(ctx context.Context, req *mcp.CallTo
 		input.Keyword,
 		input.Store,
 		input.Platform,
+		input.AppID,
 	)
 	if err != nil {
 		return nil, KeywordRankingsOutput{}, fmt.Errorf(

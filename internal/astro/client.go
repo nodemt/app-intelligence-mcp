@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"app-intelligence-mcp/internal/constants"
 	"context"
 	"fmt"
 
@@ -40,16 +41,12 @@ func (c *Client) ListTools(ctx context.Context) (*mcp.ListToolsResult, error) {
 	return c.session.ListTools(ctx, nil)
 }
 
-func (c *Client) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string) ([]Ranking, error) {
+func (c *Client) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string, appID string) ([]Ranking, error) {
+	arguments := keywordPerformanceArguments(keyword, store, platform, appID)
+
 	rankingResult, err := c.session.CallTool(ctx, &mcp.CallToolParams{
-		Name: "get_keyword_performance",
-		Arguments: map[string]any{
-			"keyword":        keyword,
-			"store":          store,
-			"platform":       platform,
-			"includeHistory": true,
-			"period":         "all",
-		},
+		Name:      constants.AstroKeywordPerformanceToolName,
+		Arguments: arguments,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("call Astro get_keyword_performance: %w", err)
@@ -74,4 +71,22 @@ func (c *Client) GetKeywordPerformance(ctx context.Context, keyword string, stor
 
 	}
 	return nil, fmt.Errorf("Astro keyword performance response contains no text content")
+}
+
+func keywordPerformanceArguments(
+	keyword, store, platform, appID string,
+) map[string]any {
+	arguments := map[string]any{
+		"keyword":        keyword,
+		"store":          store,
+		"platform":       platform,
+		"includeHistory": true,
+		"period":         constants.AstroDefaultPeriod,
+	}
+
+	if appID != "" {
+		arguments["appId"] = appID
+	}
+
+	return arguments
 }

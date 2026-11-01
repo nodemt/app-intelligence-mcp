@@ -36,10 +36,11 @@ func main() {
 		log.Printf("get_keyword_performance input schema:\n%s", data)
 	}
 
-	rankings, err := client.GetKeywordPerformance(ctx, "dibujo digital", "es", "iphone")
+	rankings, err := client.GetKeywordPerformance(ctx, "dibujo digital", "es", "iphone", "")
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("matched records: %d", len(rankings))
 
 	for _, ranking := range rankings {
 		for _, historyPoint := range ranking.History {

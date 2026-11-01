@@ -18,17 +18,19 @@ type fakeRankingProvider struct {
 	err         error
 	deadline    time.Time
 	hasDeadline bool
+	appID       string
 }
 
 type waitingRankingProvider struct{}
 
-func (f *fakeRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string) ([]astro.Ranking, error) {
+func (f *fakeRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string, appID string) ([]astro.Ranking, error) {
 	f.calls++
+	f.appID = appID
 	f.deadline, f.hasDeadline = ctx.Deadline()
 	return f.rankings, f.err
 }
 
-func (p *waitingRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string) ([]astro.Ranking, error) {
+func (p *waitingRankingProvider) GetKeywordPerformance(ctx context.Context, keyword string, store string, platform string, appID string) ([]astro.Ranking, error) {
 	<-ctx.Done()
 	return nil, ctx.Err()
 }
@@ -401,5 +403,28 @@ func TestKeywordHandlerAddsDeadline(t *testing.T) {
 			"deadline = %s, want between %s and %s",
 			provider.deadline, earliest, latest,
 		)
+	}
+}
+
+func TestKeywordHandlerPassesAppID(t *testing.T) {
+	provider := &fakeRankingProvider{}
+	handler := &KeywordHandler{provider: provider}
+
+	_, _, err := handler.GetKeywordRankings(
+		context.Background(),
+		nil,
+		KeywordRankingsInput{
+			Keyword:  "photo editor",
+			Store:    "es",
+			Platform: constants.AstroPlatformIPhone,
+			AppID:    "123456789",
+		},
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if provider.appID != "123456789" {
+		t.Errorf("provider appID = %q, want %q", provider.appID, "123456789")
 	}
 }

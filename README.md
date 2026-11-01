@@ -82,11 +82,12 @@ Queries Astro's `get_keyword_performance` tool and returns normalized records.
 }
 ```
 
-| Field      | Meaning                                                                |
-| ---------- | ---------------------------------------------------------------------- |
-| `keyword`  | Search text; Astro uses case-insensitive partial matching              |
-| `store`    | App Store country code, such as `es` or `us`                           |
-| `platform` | Astro platform: `iphone`, `ipad`, `mac`, `appletv`, or `realityDevice` |
+| Field      | Meaning                                                                             |
+| ---------- | ----------------------------------------------------------------------------------- |
+| `keyword`  | Search text; Astro uses case-insensitive partial matching                           |
+| `store`    | App Store country code, such as `es` or `us`                                        |
+| `platform` | Astro platform: `iphone`, `ipad`, `mac`, `appletv`, or `realityDevice`              |
+| `app_id`   | Optional numeric App Store ID. When omitted, results are not restricted to one app. |
 
 All three fields are part of the current input contract. The handler rejects empty or whitespace-only keywords. Additional store and platform validation is planned.
 

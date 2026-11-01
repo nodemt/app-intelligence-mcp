@@ -11,6 +11,7 @@ type RankingProvider interface {
 		keyword string,
 		store string,
 		platform string,
+		appID string,
 	) ([]astro.Ranking, error)
 }
 
