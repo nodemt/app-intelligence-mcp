@@ -52,7 +52,12 @@ func main() {
 	)
 	defer stop()
 
-	provider, err := astro.Connect(ctx, constants.AstroDefaultEndpoint)
+	endpoint := os.Getenv("ASTRO_MCP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = constants.AstroDefaultEndpoint
+	}
+
+	provider, err := astro.Connect(ctx, endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
