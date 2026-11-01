@@ -2,7 +2,6 @@ package astro
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -71,12 +70,7 @@ func (c *Client) GetKeywordPerformance(ctx context.Context, keyword string, stor
 			continue
 		}
 
-		var rankings []Ranking
-
-		if err := json.Unmarshal([]byte(textContent.Text), &rankings); err != nil {
-			return nil, fmt.Errorf("decode Astro keyword performance: %w", err)
-		}
-		return rankings, nil
+		return decodeRankings(textContent.Text)
 
 	}
 	return nil, fmt.Errorf("Astro keyword performance response contains no text content")
