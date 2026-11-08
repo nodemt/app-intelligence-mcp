@@ -18,7 +18,8 @@ A local Go MCP server that brings Astro App Store rankings and Mixpanel product 
 
 ## Requirements
 
-- Go: developed with Go 1.26.3; see `go.mod` for the declared version
+- macOS on Apple Silicon for the prebuilt package
+- Go 1.26.3 or later when building from source
 - For live use: Astro running on the same machine with its MCP server enabled
 - An Astro version exposing `get_keyword_performance`
 - For Mixpanel tools: a Mixpanel project with MCP access enabled and a saved report you can read
@@ -27,15 +28,20 @@ The application connects to the endpoint configured by `ASTRO_MCP_ENDPOINT`, def
 
 ## Getting started
 
-From the repository directory:
+Download `app-intelligence-mcp-v0.1.0-darwin-arm64.tar.gz` from
+[GitHub Releases](https://github.com/nodemt/app-intelligence-mcp/releases).
+Extract the archive and open a terminal in the extracted
+`app-intelligence-mcp` directory. The binary is ready to run without Go.
+
+### Build from source
+
+If you prefer to build it yourself, run these commands from the repository directory:
 
 ```sh
 go mod download
 go test ./...
 go build -o app-intelligence-mcp .
 ```
-
-Enable Astro's MCP server in its settings before launching the application.
 
 ### Sign in to Mixpanel
 
@@ -341,4 +347,4 @@ Remote hosting, multi-user authorization, and production security hardening are 
 
 ## License
 
-A license has not yet been selected. A license file will be added before the open-source release.
+Licensed under the [MIT License](LICENSE).
