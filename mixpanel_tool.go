@@ -95,17 +95,16 @@ func registerMixpanelOAuthTool(ctx context.Context, server *mcp.Server, rankings
 		return nil, fmt.Errorf("MIXPANEL_PROJECT_ID must be a positive integer")
 	}
 
-	oauthHandler, closeOAuth, err := mixpanel.NewLoopbackOAuth()
+	oauthHandler, err := mixpanel.LoadOAuthSession(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	connectCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	session, err := mixpanel.ConnectMCP(connectCtx, endpoint, oauthHandler)
 	if err != nil {
-		closeOAuth()
 		return nil, err
 	}
 
@@ -113,6 +112,29 @@ func registerMixpanelOAuthTool(ctx context.Context, server *mcp.Server, rankings
 
 	return func() {
 		_ = session.Close()
-		closeOAuth()
 	}, nil
+}
+
+func loginMixpanel(ctx context.Context) error {
+	endpoint := os.Getenv("MIXPANEL_MCP_ENDPOINT")
+	if endpoint == "" {
+		return fmt.Errorf("MIXPANEL_MCP_ENDPOINT is required for mixpanel-login")
+	}
+
+	oauthHandler, closeOAuth, err := mixpanel.NewLoopbackOAuth()
+	if err != nil {
+		return err
+	}
+	defer closeOAuth()
+
+	loginCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
+	session, err := mixpanel.ConnectMCP(loginCtx, endpoint, oauthHandler)
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	return mixpanel.SaveOAuthSession(loginCtx, endpoint, oauthHandler)
 }

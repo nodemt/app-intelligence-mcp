@@ -61,6 +61,14 @@ func main() {
 	)
 	defer stop()
 
+	if len(os.Args) == 2 && os.Args[1] == "mixpanel-login" {
+		if err := loginMixpanel(ctx); err != nil {
+			log.Fatal(err)
+		}
+		log.Print("Mixpanel login saved")
+		return
+	}
+
 	endpoint := os.Getenv("ASTRO_MCP_ENDPOINT")
 	if endpoint == "" {
 		endpoint = constants.AstroDefaultEndpoint
