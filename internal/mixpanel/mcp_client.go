@@ -9,6 +9,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type MCPReportProvider struct {
+	Session *mcp.ClientSession
+}
+
 func ConnectMCP(ctx context.Context, endpoint string, oauthHandler auth.OAuthHandler) (*mcp.ClientSession, error) {
 	client := mcp.NewClient(&mcp.Implementation{
 		Name:    constants.AppName,
@@ -25,4 +29,13 @@ func ConnectMCP(ctx context.Context, endpoint string, oauthHandler auth.OAuthHan
 	}
 
 	return session, nil
+}
+
+func (p *MCPReportProvider) GetSavedReport(ctx context.Context, projectID, bookmarkID int) (SavedReport, error) {
+	report, err := GetMCPReport(ctx, p.Session, projectID, bookmarkID)
+	if err != nil {
+		return SavedReport{}, err
+	}
+
+	return SavedReport{Results: report.Results}, nil
 }

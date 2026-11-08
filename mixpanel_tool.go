@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"app-intelligence-mcp/internal/mixpanel"
 
@@ -16,16 +17,16 @@ type SavedProductReportInput struct {
 	BookmarkID int `json:"bookmark_id" jsonschema:"ID of a saved Mixpanel report"`
 }
 
+type SavedReportProvider interface {
+	GetSavedReport(ctx context.Context, projectID, bookmarkID int) (mixpanel.SavedReport, error)
+}
+
 type MixpanelHandler struct {
-	client    *mixpanel.Client
+	client    SavedReportProvider
 	projectID int
 }
 
-func (h *MixpanelHandler) GetSavedProductReport(
-	ctx context.Context,
-	_ *mcp.CallToolRequest,
-	input SavedProductReportInput,
-) (*mcp.CallToolResult, mixpanel.SavedReport, error) {
+func (h *MixpanelHandler) GetSavedProductReport(ctx context.Context, _ *mcp.CallToolRequest, input SavedProductReportInput) (*mcp.CallToolResult, mixpanel.SavedReport, error) {
 	if input.BookmarkID <= 0 {
 		return nil, mixpanel.SavedReport{}, fmt.Errorf("bookmark_id must be positive")
 	}
@@ -56,8 +57,13 @@ func registerMixpanelTool(server *mcp.Server) error {
 		return fmt.Errorf("MIXPANEL_PROJECT_ID must be a positive integer")
 	}
 
+	addMixpanelTool(server, mixpanel.NewClient(endpoint, username, secret), projectID)
+	return nil
+}
+
+func addMixpanelTool(server *mcp.Server, provider SavedReportProvider, projectID int) {
 	handler := &MixpanelHandler{
-		client:    mixpanel.NewClient(endpoint, username, secret),
+		client:    provider,
 		projectID: projectID,
 	}
 
@@ -71,9 +77,36 @@ func registerMixpanelTool(server *mcp.Server) error {
 				"date_range":  map[string]any{"type": "object"},
 				"headers":     map[string]any{"type": []string{"array", "null"}},
 				"series":      map[string]any{},
+				"results":     map[string]any{},
 			},
 		},
 	}, handler.GetSavedProductReport)
+}
 
-	return nil
+func registerMixpanelOAuthTool(ctx context.Context, server *mcp.Server, endpoint string) (func(), error) {
+	projectID, err := strconv.Atoi(os.Getenv("MIXPANEL_PROJECT_ID"))
+	if err != nil || projectID <= 0 {
+		return nil, fmt.Errorf("MIXPANEL_PROJECT_ID must be a positive integer")
+	}
+
+	oauthHandler, closeOAuth, err := mixpanel.NewLoopbackOAuth()
+	if err != nil {
+		return nil, err
+	}
+
+	connectCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
+	session, err := mixpanel.ConnectMCP(connectCtx, endpoint, oauthHandler)
+	if err != nil {
+		closeOAuth()
+		return nil, err
+	}
+
+	addMixpanelTool(server, &mixpanel.MCPReportProvider{Session: session}, projectID)
+
+	return func() {
+		_ = session.Close()
+		closeOAuth()
+	}, nil
 }

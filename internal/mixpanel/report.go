@@ -12,4 +12,5 @@ type SavedReport struct {
 	DateRange  DateRange       `json:"date_range"`
 	Headers    []string        `json:"headers"`
 	Series     json.RawMessage `json:"series"`
+	Results    json.RawMessage `json:"results,omitempty"`
 }
