@@ -1,8 +1,8 @@
 # App Intelligence MCP
 
-A Go MCP server that brings mobile app intelligence to AI agents, starting with App Store Optimization (ASO) data from Astro.
+A local Go MCP server that brings Astro App Store rankings and Mixpanel product analytics together in one tool call.
 
-> **Early development:** Live Astro integration is working. Mixpanel and combined analytics are planned. Tool contracts may change; the project is not yet production-ready.
+> **Early development:** Astro and Mixpanel work together over stdio. Tool contracts may change.
 
 ## Current capabilities
 
@@ -12,6 +12,8 @@ A Go MCP server that brings mobile app intelligence to AI agents, starting with 
 - Structured output distinguishing ranked, missing, and outside-chart values
 - Provider update timestamps preserved in results
 - Dated historical comparisons in tool output with explicit availability statuses
+- Saved Mixpanel reports through Mixpanel MCP with browser-based OAuth
+- One combined response containing Astro rankings and a saved Mixpanel report
 - Unit tests, offline MCP integration tests, and opt-in live Astro and subprocess stdio tests
 
 ## Requirements
@@ -19,6 +21,7 @@ A Go MCP server that brings mobile app intelligence to AI agents, starting with 
 - Go: developed with Go 1.26.3; see `go.mod` for the declared version
 - For live use: Astro running on the same machine with its MCP server enabled
 - An Astro version exposing `get_keyword_performance`
+- For Mixpanel tools: a Mixpanel project with MCP access enabled and a saved report you can read
 
 The application connects to the endpoint configured by `ASTRO_MCP_ENDPOINT`, defaulting to `http://127.0.0.1:8089/mcp`, during startup. If the connection fails, the application exits. Normal tests use a fake provider and require neither Astro nor a Claude subscription.
 
@@ -34,10 +37,47 @@ go build -o app-intelligence-mcp .
 
 Enable Astro's MCP server in its settings before launching the application.
 
-### Connect an MCP client
+### Sign in to Mixpanel
 
-Configure your MCP client to launch the compiled binary over stdio.
-For clients that accept an `mcpServers` configuration:
+Enable Astro's MCP server for normal server startup. For Mixpanel, use the
+MCP endpoint for your project's region. This example uses the EU endpoint.
+
+```sh
+MIXPANEL_MCP_ENDPOINT=https://mcp-eu.mixpanel.com/mcp \
+  ./app-intelligence-mcp mixpanel-login
+```
+
+Open the URL printed in the terminal, grant access in your browser, and
+wait for `Mixpanel login saved`. Run this command under the same OS user
+that launches the MCP client. It stores the access token in the user's
+configuration directory under `app-intelligence-mcp/mixpanel-login.json`.
+Run the login command again when the token expires or you switch endpoints.
+
+### Connect Codex CLI
+
+Add the following to `~/.codex/config.toml`. Replace the binary path and
+`MIXPANEL_PROJECT_ID` with your own values. Use the same Mixpanel endpoint
+as in the login command.
+
+```toml
+[mcp_servers.app_intelligence]
+command = "/absolute/path/to/app-intelligence-mcp"
+startup_timeout_sec = 30
+
+[mcp_servers.app_intelligence.env]
+ASTRO_MCP_ENDPOINT = "http://127.0.0.1:8089/mcp"
+MIXPANEL_MCP_ENDPOINT = "https://mcp-eu.mixpanel.com/mcp"
+MIXPANEL_PROJECT_ID = "123456"
+```
+
+Start Codex and run `/mcp` to check that `app_intelligence` is connected.
+The combined tool was verified from Codex CLI, including a restart that
+reused the saved Mixpanel login.
+
+### Connect another stdio client
+
+For clients that accept an `mcpServers` configuration, the same setup
+looks like this:
 
 ```json
 {
@@ -45,7 +85,9 @@ For clients that accept an `mcpServers` configuration:
 		"app-intelligence": {
 			"command": "/absolute/path/to/app-intelligence-mcp",
 			"env": {
-				"ASTRO_MCP_ENDPOINT": "http://127.0.0.1:8089/mcp"
+				"ASTRO_MCP_ENDPOINT": "http://127.0.0.1:8089/mcp",
+				"MIXPANEL_MCP_ENDPOINT": "https://mcp-eu.mixpanel.com/mcp",
+				"MIXPANEL_PROJECT_ID": "123456"
 			}
 		}
 	}
@@ -54,19 +96,69 @@ For clients that accept an `mcpServers` configuration:
 
 Replace `command` with the absolute path to your compiled binary.
 Configuration locations and supported fields depend on the client.
-
-Astro must be running on the same machine with its MCP server enabled.
-The application connects to Astro during startup and exits if that
-connection fails. The endpoint defaults to
-`http://127.0.0.1:8089/mcp` when `ASTRO_MCP_ENDPOINT` is empty.
+Leave the Mixpanel variables unset to run with Astro alone.
 
 The binary waits for MCP messages; it does not provide an interactive
 prompt or expose its own HTTP endpoint. Protocol messages use stdout;
 application logs use stderr.
 
 Subprocess startup, tool discovery, and live Astro tool invocation over
-stdio have been verified using the official Go SDK client. Individual
-desktop client configurations have not yet been verified.
+stdio have also been verified using the official Go SDK client.
+
+## Tool `get_app_intelligence`
+
+Pass an Astro keyword query and the bookmark ID of a saved Mixpanel
+report for the same app. You can also pass `app_id` to restrict the
+Astro results to one App Store ID.
+
+```json
+{
+  "keyword": "dibujo digital",
+  "store": "es",
+  "platform": "iphone",
+  "bookmark_id": 12345678
+}
+```
+
+The response contains rankings in `astro.rankings` and the saved report
+in `mixpanel`. With OAuth, metric data appears under `mixpanel.results`.
+This excerpt uses a demo event:
+
+```json
+{
+  "astro": {
+    "rankings": [
+      {
+        "app": "Example App",
+        "keyword": "dibujo digital",
+        "current_rank": null,
+        "current_rank_status": "outside_charts"
+      }
+    ]
+  },
+  "mixpanel": {
+    "results": {
+      "Total Events of MCP Demo App Opened": {
+        "headers": ["date", "value"],
+        "rows": [["2026-11-08T07:00", 1]]
+      }
+    }
+  }
+}
+```
+
+The two sources retain their own dates. Choose the matching report and
+check its date range against the Astro comparison before interpreting
+the metrics together. An empty report is a valid result. A provider
+failure returns a tool error identifying the source.
+
+## Tool `get_saved_product_report`
+
+Reads the Mixpanel report on its own. Pass the positive `bookmark_id`
+from the saved report URL, using a report in the configured project.
+The OAuth path returns report data in `results`. The direct Query API
+path uses `series` and requires a Mixpanel plan that permits API queries.
+See `.env.example` for the configuration variables.
 
 ## Tool: `get_keyword_rankings`
 
@@ -150,30 +242,36 @@ With fewer than two observations, both comparison dates are `null`. Otherwise th
 
 ## Architecture
 
-The application is an MCP server for its callers and an MCP client for Astro.
+The application serves callers over MCP and connects upstream to Astro and Mixpanel.
 
 ```mermaid
 flowchart LR
     Agent["AI Agent / MCP Client"]
     Astro["Astro Local MCP Server"]
+    Mixpanel["Mixpanel MCP Server"]
 
     subgraph App["App Intelligence MCP · Go"]
         Server["MCP Server"]
         Handler["Keyword Handler"]
         Client["Astro Client"]
+        Combined["App Intelligence Handler"]
+        Reports["Mixpanel Report Handler"]
         Server --> Handler
-        Handler -->|"Query rankings"| Client
-        Client -->|"Decoded records"| Handler
-        Handler -->|"Normalized output"| Server
+        Server --> Reports
+        Server --> Combined
+        Combined --> Handler
+        Combined --> Reports
+        Handler --> Client
     end
 
     Agent <-->|"stdio · MCP"| Server
     Client <-->|"HTTP · MCP"| Astro
+    Reports <-->|"HTTPS · MCP with OAuth"| Mixpanel
 
     classDef external fill:#f1f5f9,stroke:#64748b,color:#0f172a
     classDef component fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a
-    class Agent,Astro external
-    class Server,Handler,Client component
+    class Agent,Astro,Mixpanel external
+    class Server,Handler,Client,Combined,Reports component
     style App fill:#f8fafc,stroke:#94a3b8,color:#0f172a
 ```
 
@@ -183,7 +281,9 @@ flowchart LR
 | -------------------- | ------------------------------------------------------------------- |
 | Root application     | Server setup, tool contracts, handler, and provider interface       |
 | `internal/astro`     | Connection, provider types, normalization, and history calculations |
+| `internal/mixpanel`  | Report clients, OAuth login, and local access-token storage         |
 | `cmd/astro-probe`    | Separate discovery and live-data inspection program                 |
+| `cmd/mixpanel-probe` | Separate OAuth and report inspection program                        |
 | Root tests           | Offline MCP tests and opt-in live Astro / subprocess stdio tests    |
 | `internal/constants` | Shared application, MCP, and Astro constants                        |
 
@@ -235,7 +335,7 @@ The probe also contains example query values that should be adjusted for your da
 
 Tool results can leave the local machine through the connected AI client. Review the data you expose and your client's data-handling policies.
 
-The current tool reads data and does not expose Astro's mutation tools. SIGINT and SIGTERM cancel the application context so it can close its provider connection. Treat provider text as data, not instructions. Keep credentials and private analytics fixtures out of source control and published logs.
+The exposed tools read data. SIGINT and SIGTERM cancel the application context so it can close its provider connections. Treat provider text as data. Keep the local Mixpanel login file, credentials, and private analytics fixtures out of source control and published logs.
 
 Remote hosting, multi-user authorization, and production security hardening are outside the current implementation.
 
