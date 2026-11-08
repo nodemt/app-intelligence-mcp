@@ -74,6 +74,11 @@ func main() {
 
 	server := newServer(provider)
 
+	if err := registerMixpanelTool(server); err != nil {
+		log.Print(err)
+		return
+	}
+
 	if err := server.Run(ctx, &mcp.StdioTransport{}); err != nil {
 		if !errors.Is(err, context.Canceled) {
 			log.Print(err)

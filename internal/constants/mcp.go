@@ -10,3 +10,5 @@ const (
 
 	AstroKeywordPerformanceToolName = "get_keyword_performance"
 )
+
+const SavedProductReportToolName = "get_saved_product_report"
