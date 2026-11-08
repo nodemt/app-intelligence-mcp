@@ -75,13 +75,13 @@ func main() {
 	server := newServer(provider)
 
 	if endpoint := os.Getenv("MIXPANEL_MCP_ENDPOINT"); endpoint != "" {
-		closeMixpanel, err := registerMixpanelOAuthTool(ctx, server, endpoint)
+		closeMixpanel, err := registerMixpanelOAuthTool(ctx, server, provider, endpoint)
 		if err != nil {
 			log.Print(err)
 			return
 		}
 		defer closeMixpanel()
-	} else if err := registerMixpanelTool(server); err != nil {
+	} else if err := registerMixpanelTool(server, provider); err != nil {
 		log.Print(err)
 		return
 	}

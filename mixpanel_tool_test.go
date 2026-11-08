@@ -43,8 +43,9 @@ func TestSavedProductReportTool(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	server := newServer(&fakeRankingProvider{})
-	if err := registerMixpanelTool(server); err != nil {
+	rankings := &fakeRankingProvider{}
+	server := newServer(rankings)
+	if err := registerMixpanelTool(server, rankings); err != nil {
 		t.Fatalf("register Mixpanel tool: %v", err)
 	}
 

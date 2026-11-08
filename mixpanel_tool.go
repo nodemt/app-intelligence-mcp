@@ -39,7 +39,7 @@ func (h *MixpanelHandler) GetSavedProductReport(ctx context.Context, _ *mcp.Call
 	return nil, report, nil
 }
 
-func registerMixpanelTool(server *mcp.Server) error {
+func registerMixpanelTool(server *mcp.Server, rankings RankingProvider) error {
 	endpoint := os.Getenv("MIXPANEL_QUERY_ENDPOINT")
 	username := os.Getenv("MIXPANEL_SERVICE_ACCOUNT_USERNAME")
 	secret := os.Getenv("MIXPANEL_SERVICE_ACCOUNT_SECRET")
@@ -57,33 +57,39 @@ func registerMixpanelTool(server *mcp.Server) error {
 		return fmt.Errorf("MIXPANEL_PROJECT_ID must be a positive integer")
 	}
 
-	addMixpanelTool(server, mixpanel.NewClient(endpoint, username, secret), projectID)
+	addMixpanelTools(server, rankings, mixpanel.NewClient(endpoint, username, secret), projectID)
 	return nil
 }
 
-func addMixpanelTool(server *mcp.Server, provider SavedReportProvider, projectID int) {
+func addMixpanelTools(server *mcp.Server, rankings RankingProvider, provider SavedReportProvider, projectID int) {
 	handler := &MixpanelHandler{
 		client:    provider,
 		projectID: projectID,
 	}
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        constants.SavedProductReportToolName,
-		Description: "Read a saved Mixpanel report by bookmark ID.",
-		OutputSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"computed_at": map[string]any{"type": "string"},
-				"date_range":  map[string]any{"type": "object"},
-				"headers":     map[string]any{"type": []string{"array", "null"}},
-				"series":      map[string]any{},
-				"results":     map[string]any{},
-			},
-		},
+		Name:         constants.SavedProductReportToolName,
+		Description:  "Read a saved Mixpanel report by bookmark ID.",
+		OutputSchema: savedReportOutputSchema(),
 	}, handler.GetSavedProductReport)
+
+	addAppIntelligenceTool(server, &KeywordHandler{provider: rankings}, handler)
 }
 
-func registerMixpanelOAuthTool(ctx context.Context, server *mcp.Server, endpoint string) (func(), error) {
+func savedReportOutputSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"computed_at": map[string]any{"type": "string"},
+			"date_range":  map[string]any{"type": "object"},
+			"headers":     map[string]any{"type": []string{"array", "null"}},
+			"series":      map[string]any{},
+			"results":     map[string]any{},
+		},
+	}
+}
+
+func registerMixpanelOAuthTool(ctx context.Context, server *mcp.Server, rankings RankingProvider, endpoint string) (func(), error) {
 	projectID, err := strconv.Atoi(os.Getenv("MIXPANEL_PROJECT_ID"))
 	if err != nil || projectID <= 0 {
 		return nil, fmt.Errorf("MIXPANEL_PROJECT_ID must be a positive integer")
@@ -103,7 +109,7 @@ func registerMixpanelOAuthTool(ctx context.Context, server *mcp.Server, endpoint
 		return nil, err
 	}
 
-	addMixpanelTool(server, &mixpanel.MCPReportProvider{Session: session}, projectID)
+	addMixpanelTools(server, rankings, &mixpanel.MCPReportProvider{Session: session}, projectID)
 
 	return func() {
 		_ = session.Close()
