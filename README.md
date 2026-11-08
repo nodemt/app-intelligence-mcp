@@ -2,6 +2,8 @@
 
 A local Go MCP server that brings Astro App Store rankings and Mixpanel product analytics together in one tool call.
 
+Set it up with [Codex CLI](#connect-codex-cli), [Claude Code](#connect-claude-code), or [Cursor and other local MCP clients](#connect-cursor-or-another-stdio-client).
+
 > **Early development:** Astro and Mixpanel work together over stdio. Tool contracts may change.
 
 ## Current capabilities
@@ -24,7 +26,7 @@ A local Go MCP server that brings Astro App Store rankings and Mixpanel product 
 - An Astro version exposing `get_keyword_performance`
 - For Mixpanel tools: a Mixpanel project with MCP access enabled and a saved report you can read
 
-The application connects to the endpoint configured by `ASTRO_MCP_ENDPOINT`, defaulting to `http://127.0.0.1:8089/mcp`, during startup. If the connection fails, the application exits. Normal tests use a fake provider and require neither Astro nor a Claude subscription.
+The application connects to the endpoint configured by `ASTRO_MCP_ENDPOINT`, defaulting to `http://127.0.0.1:8089/mcp`, during startup. If the connection fails, the application exits. Normal tests use fake providers and run without Astro, Mixpanel, or an external MCP client.
 
 ## Getting started
 
@@ -90,15 +92,34 @@ Start Codex and run `/mcp` to check that `app_intelligence` is connected.
 The combined tool was verified from Codex CLI, including a restart that
 reused the saved Mixpanel login.
 
-### Connect another stdio client
+### Connect Claude Code
 
-For clients that accept an `mcpServers` configuration, the same setup
-looks like this:
+After running `mixpanel-login`, replace the binary path and project ID
+below. Use the same Mixpanel endpoint as in the login command.
+
+```sh
+claude mcp add --scope user \
+  --env ASTRO_MCP_ENDPOINT=http://127.0.0.1:8089/mcp \
+  --env MIXPANEL_MCP_ENDPOINT=https://mcp-eu.mixpanel.com/mcp \
+  --env MIXPANEL_PROJECT_ID=123456 \
+  --transport stdio app_intelligence -- /absolute/path/to/app-intelligence-mcp
+```
+
+Open Claude Code locally and run `/mcp` to check the connection.
+See the [Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
+
+### Connect Cursor or another stdio client
+
+In Cursor, add this entry to `~/.cursor/mcp.json` for all projects or to
+`.cursor/mcp.json` for the current project. Other local clients that
+accept an `mcpServers` configuration can use the same entry. Check your
+client's settings for the file location. See the [Cursor MCP guide](https://cursor.com/docs/mcp).
 
 ```json
 {
 	"mcpServers": {
 		"app-intelligence": {
+			"type": "stdio",
 			"command": "/absolute/path/to/app-intelligence-mcp",
 			"env": {
 				"ASTRO_MCP_ENDPOINT": "http://127.0.0.1:8089/mcp",
@@ -110,9 +131,9 @@ looks like this:
 }
 ```
 
-Replace `command` with the absolute path to your compiled binary.
-Configuration locations and supported fields depend on the client.
-Leave the Mixpanel variables unset to run with Astro alone.
+For any client, replace the binary path and Mixpanel project ID, and use
+the same Mixpanel endpoint as in the login command. Leave the Mixpanel
+variables unset to run with Astro alone.
 
 The binary waits for MCP messages; it does not provide an interactive
 prompt or expose its own HTTP endpoint. Protocol messages use stdout;
@@ -120,6 +141,8 @@ application logs use stderr.
 
 Subprocess startup, tool discovery, and live Astro tool invocation over
 stdio have also been verified using the official Go SDK client.
+The Claude Code and Cursor examples follow their documented stdio setup
+and are pending an end-to-end client test.
 
 ## Tool `get_app_intelligence`
 
