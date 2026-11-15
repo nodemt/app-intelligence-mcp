@@ -14,4 +14,7 @@ const (
 const (
 	SavedProductReportToolName = "get_saved_product_report"
 	AppIntelligenceToolName    = "get_app_intelligence"
+
+	CompareAppPeriodsToolName        = "compare_app_periods"
+	CompareAppPeriodsToolDescription = "Validate two non-overlapping date ranges for an app comparison."
 )

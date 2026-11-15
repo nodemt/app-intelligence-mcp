@@ -46,6 +46,11 @@ func addAppIntelligenceTool(server *mcp.Server, rankings *KeywordHandler, report
 			},
 		},
 	}, handler.getAppIntelligence)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        constants.CompareAppPeriodsToolName,
+		Description: constants.CompareAppPeriodsToolDescription,
+	}, handler.compareAppPeriods)
 }
 
 func (h *appIntelligenceHandler) getAppIntelligence(ctx context.Context, req *mcp.CallToolRequest, input AppIntelligenceInput) (*mcp.CallToolResult, AppIntelligenceOutput, error) {

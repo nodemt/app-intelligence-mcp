@@ -127,41 +127,9 @@ func newServer(provider RankingProvider) *mcp.Server {
 }
 
 func (h *KeywordHandler) GetKeywordRankings(ctx context.Context, req *mcp.CallToolRequest, input KeywordRankingsInput) (*mcp.CallToolResult, KeywordRankingsOutput, error) {
-	if strings.TrimSpace(input.Keyword) == "" {
-		return nil, KeywordRankingsOutput{}, fmt.Errorf("keyword must not be empty")
-	}
-
-	if strings.TrimSpace(input.Store) == "" {
-		return nil, KeywordRankingsOutput{}, fmt.Errorf("store must not be empty")
-	}
-
-	switch input.Platform {
-	case constants.AstroPlatformIPhone,
-		constants.AstroPlatformIPad,
-		constants.AstroPlatformMac,
-		constants.AstroPlatformAppleTV,
-		constants.AstroPlatformRealityDevice:
-
-	default:
-		return nil, KeywordRankingsOutput{}, fmt.Errorf(
-			"unsupported platform: %q", input.Platform,
-		)
-	}
-
-	providerCtx, cancel := context.WithTimeout(ctx, constants.AstroRequestTimeout)
-	defer cancel()
-
-	rankings, err := h.provider.GetKeywordPerformance(
-		providerCtx,
-		input.Keyword,
-		input.Store,
-		input.Platform,
-		input.AppID,
-	)
+	rankings, err := h.fetchKeywordRankings(ctx, input)
 	if err != nil {
-		return nil, KeywordRankingsOutput{}, fmt.Errorf(
-			"get keyword rankings: %w", err,
-		)
+		return nil, KeywordRankingsOutput{}, err
 	}
 
 	output := KeywordRankingsOutput{
@@ -189,6 +157,47 @@ func (h *KeywordHandler) GetKeywordRankings(ctx context.Context, req *mcp.CallTo
 	}
 
 	return nil, output, nil
+}
+
+func (h *KeywordHandler) fetchKeywordRankings(ctx context.Context, input KeywordRankingsInput) ([]astro.Ranking, error) {
+	if strings.TrimSpace(input.Keyword) == "" {
+		return nil, fmt.Errorf("keyword must not be empty")
+	}
+
+	if strings.TrimSpace(input.Store) == "" {
+		return nil, fmt.Errorf("store must not be empty")
+	}
+
+	switch input.Platform {
+	case constants.AstroPlatformIPhone,
+		constants.AstroPlatformIPad,
+		constants.AstroPlatformMac,
+		constants.AstroPlatformAppleTV,
+		constants.AstroPlatformRealityDevice:
+
+	default:
+		return nil, fmt.Errorf(
+			"unsupported platform: %q", input.Platform,
+		)
+	}
+
+	providerCtx, cancel := context.WithTimeout(ctx, constants.AstroRequestTimeout)
+	defer cancel()
+
+	rankings, err := h.provider.GetKeywordPerformance(
+		providerCtx,
+		input.Keyword,
+		input.Store,
+		input.Platform,
+		input.AppID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"get keyword rankings: %w", err,
+		)
+	}
+
+	return rankings, nil
 }
 
 func mockRanking(keyword string) RankingSnapshot {
