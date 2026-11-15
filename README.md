@@ -32,13 +32,13 @@ The application connects to the endpoint configured by `ASTRO_MCP_ENDPOINT`, def
 
 ## Getting started
 
-Download `app-intelligence-mcp-v0.1.0-darwin-arm64.dmg` and its
+Download `app-intelligence-mcp-v0.2.0-darwin-arm64.dmg` and its
 `.dmg.sha256` file from
 [GitHub Releases](https://github.com/nodemt/app-intelligence-mcp/releases).
 From the download directory, verify the disk image:
 
 ```sh
-shasum -a 256 -c app-intelligence-mcp-v0.1.0-darwin-arm64.dmg.sha256
+shasum -a 256 -c app-intelligence-mcp-v0.2.0-darwin-arm64.dmg.sha256
 ```
 
 Open the disk image and copy its contents into a folder on your Mac, for
