@@ -1,5 +1,7 @@
 # App Intelligence MCP
 
+<img src="assets/app-intelligence-icon.png" alt="App Intelligence MCP icon" width="96">
+
 A local Go MCP server that brings Astro App Store rankings and Mixpanel product analytics together in one tool call.
 
 Set it up with [Codex CLI](#connect-codex-cli), [Claude Code](#connect-claude-code), or [Cursor and other local MCP clients](#connect-cursor-or-another-stdio-client).
