@@ -16,5 +16,5 @@ const (
 	AppIntelligenceToolName    = "get_app_intelligence"
 
 	CompareAppPeriodsToolName        = "compare_app_periods"
-	CompareAppPeriodsToolDescription = "Validate two non-overlapping date ranges for an app comparison."
+	CompareAppPeriodsToolDescription = "Compare Astro keyword rankings and one daily Mixpanel event count across two non-overlapping date ranges."
 )

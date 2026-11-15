@@ -193,6 +193,60 @@ check its date range against the Astro comparison before interpreting
 the metrics together. An empty report is a valid result. A provider
 failure returns a tool error identifying the source.
 
+## Tool `compare_app_periods`
+
+Compare the last Astro rank observed in each period with the total event count
+from a daily Mixpanel report for the same app. Use the Mixpanel MCP OAuth
+setup above and select an additive metric such as Total Events. The saved
+report must contain daily `date` and `value` columns with one row per day.
+Use the metric's exact name from the report.
+
+```json
+{
+  "keyword": "dibujo digital",
+  "store": "es",
+  "platform": "iphone",
+  "bookmark_id": 12345678,
+  "metric": "Total Events of App Opened",
+  "before": {"from": "2026-11-01", "to": "2026-11-07"},
+  "after": {"from": "2026-11-08", "to": "2026-11-14"}
+}
+```
+
+Both dates are inclusive. The before period must end before the after
+period starts. Astro observations use UTC day boundaries, and Mixpanel
+rows are grouped by their reported calendar dates. You can pass `app_id`
+to restrict the Astro matches to a single App Store ID.
+
+Example response with illustrative data:
+
+```json
+{
+  "before": {"from": "2026-11-01", "to": "2026-11-07"},
+  "after": {"from": "2026-11-08", "to": "2026-11-14"},
+  "rankings": [{
+    "app": "Example App",
+    "keyword": "dibujo digital",
+    "before": {"observed_at": "2026-11-07T18:00:00Z", "rank": 18, "status": "ranked"},
+    "after": {"observed_at": "2026-11-14T18:00:00Z", "rank": 11, "status": "ranked"},
+    "rank_change": 7
+  }],
+  "mixpanel": {
+    "metric": "Total Events of App Opened",
+    "before": {"total": 40, "observed_days": 7, "expected_days": 7},
+    "after": {"total": 52, "observed_days": 7, "expected_days": 7},
+    "total_change": 12
+  }
+}
+```
+
+Positive `rank_change` means the rank improved. The value is `null` if
+either period lacks a numeric rank. Mixpanel totals sum the observed
+days, including explicit zero counts. Missing rows and `null` counts
+reduce `observed_days`. A period with zero observed days has a `null` total.
+`total_change` is after minus before and is available when both periods
+have full daily coverage.
+
 ## Tool `get_saved_product_report`
 
 Reads the Mixpanel report on its own. Pass the positive `bookmark_id`

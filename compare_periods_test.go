@@ -22,10 +22,10 @@ func TestCompareAppPeriodsTool(t *testing.T) {
 		Keyword: "dibujo digital",
 		History: []astro.RankingPoint{
 			{Date: time.Date(2026, time.November, 7, 18, 0, 0, 0, time.UTC), Ranking: &beforeRank},
-			{Date: time.Date(2026, time.November, 8, 18, 0, 0, 0, time.UTC), Ranking: &afterRank},
+			{Date: time.Date(2026, time.November, 9, 18, 0, 0, 0, time.UTC), Ranking: &afterRank},
 		},
 	}}}
-	const results = `{"App Opens":{"headers":["date","value"],"rows":[["2026-11-07",40],["2026-11-08",52]]}}`
+	const results = `{"App Opens":{"headers":["date","value"],"rows":[["2026-11-07",40],["2026-11-08",20],["2026-11-09",32]]}}`
 	reports := stubSavedReportProvider{
 		report: mixpanel.SavedReport{Results: json.RawMessage(results)},
 	}
@@ -55,7 +55,7 @@ func TestCompareAppPeriodsTool(t *testing.T) {
 			"bookmark_id": 93903711,
 			"metric":      "App Opens",
 			"before":      map[string]string{"from": "2026-11-07", "to": "2026-11-07"},
-			"after":       map[string]string{"from": "2026-11-08", "to": "2026-11-08"},
+			"after":       map[string]string{"from": "2026-11-08", "to": "2026-11-09"},
 		},
 	})
 	if err != nil {

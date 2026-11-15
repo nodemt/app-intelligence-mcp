@@ -177,7 +177,7 @@ func parseDateRange(input DateRangeInput) (time.Time, time.Time, error) {
 		return time.Time{}, time.Time{}, fmt.Errorf("invalid from date %q: %w", input.From, err)
 	}
 
-	to, err := time.Parse(time.DateOnly, input.From)
+	to, err := time.Parse(time.DateOnly, input.To)
 	if err != nil {
 		return time.Time{}, time.Time{}, fmt.Errorf("invalid to date %q: %w", input.To, err)
 	}
